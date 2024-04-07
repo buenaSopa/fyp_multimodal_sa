@@ -1,0 +1,8 @@
+streamlit
+textblob
+transformers
+numpy
+streamlit-shap
+openai
+python-dotenv
+shap
