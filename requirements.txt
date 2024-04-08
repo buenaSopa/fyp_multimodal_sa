@@ -8,3 +8,6 @@ python-dotenv
 shap
 matplotlib
 ipython
+'transformers[torch]'
+'transformers[tf-cpu]'
+'transformers[flax]'
