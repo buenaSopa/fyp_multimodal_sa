@@ -6,3 +6,4 @@ streamlit-shap
 openai
 python-dotenv
 shap
+matplotlib
