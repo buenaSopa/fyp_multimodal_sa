@@ -21,10 +21,28 @@ def predict_height(*strings):
 classifier = pipeline("sentiment-analysis")
 explainer = shap.Explainer(classifier)
 
-st.title("A Simple Sentiment Analysis Explainer with SHapley Additive exPlanations WebApp.") 
-message = st.text_area("Please Enter your text") 
+option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis"])
 
+if option == "Text Sentiment Analysis":
+    st.title("A Simple Sentiment Analysis Explainer with SHapley Additive exPlanations WebApp.") 
 
+    message = st.text_area("Please Enter your text") 
+
+elif option == "Audio Sentiment Analysis":
+    st.title("Audio Sentiment Analysis") 
+    st.link_button('recoding audio here', 'https://online-voice-recorder.com/')
+
+    uploaded_file = st.file_uploader("Upload your audio file", type=["wav", "mp3", "flac"])
+
+    pipe = pipeline("automatic-speech-recognition")
+
+    if uploaded_file is not None:
+        data = uploaded_file.read()
+
+    message = pipe(data)['text']
+
+    st.write(message)
+    
 if st.button("Analyze the Sentiment"): 
     blob = TextBlob(message) 
     result = classifier([message])
@@ -52,8 +70,6 @@ if st.button("Analyze the Sentiment"):
         st_shap(shap.plots.bar(explanation[id_to_explain,:,output_to_explain]))
     except Exception as e:
         print(f"An error occurred while generating bar plot: {e}")
-
-
 
     # Given data
     values = shap_values.values
