@@ -8,6 +8,8 @@ import os
 from dotenv import load_dotenv
 import shap
 
+@st.cache
+
 load_dotenv()
 shap.initjs()
 
