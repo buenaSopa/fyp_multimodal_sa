@@ -31,7 +31,7 @@ if option == "Text Sentiment Analysis":
 
 elif option == "Audio Sentiment Analysis":
     st.title("Audio Sentiment Analysis") 
-    st.link_button('recoding audio here', 'https://online-voice-recorder.com/')
+    st.markdown('[recording audio here](https://online-voice-recorder.com/)')
 
     uploaded_file = st.file_uploader("Upload your audio file", type=["wav", "mp3", "flac"])
 
