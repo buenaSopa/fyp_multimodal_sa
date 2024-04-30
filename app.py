@@ -19,9 +19,19 @@ def predict_height(*strings):
     predicted_height = total_length * height_per_character
     return predicted_height+300
 
-st.cache(allow_output_mutation=True)
-classifier = pipeline("sentiment-analysis")
-explainer = shap.Explainer(classifier)
+@st.cache(allow_output_mutation=True)
+def load_sentiment_model():
+    return pipeline("sentiment-analysis")
+
+@st.cache(allow_output_mutation=True)
+def create_shap_explainer(model):
+    return shap.Explainer(model)
+
+classifier = load_sentiment_model()
+explainer = create_shap_explainer(classifier)
+
+#classifier = pipeline("sentiment-analysis")
+#explainer = shap.Explainer(classifier)
 
 option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis"])
 
