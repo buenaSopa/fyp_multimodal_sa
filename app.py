@@ -11,8 +11,7 @@ import shap
 load_dotenv()
 shap.initjs()
 
-st.cache_data.clear()
-st.cache_resource.clear()
+@st.cache
 def predict_height(*strings):
     total_length = sum(len(s) for s in strings)
     # Assuming each character occupies a certain amount of height in the styling
