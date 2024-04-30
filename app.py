@@ -19,7 +19,7 @@ def predict_height(*strings):
     predicted_height = total_length * height_per_character
     return predicted_height+300
 
-@st.cache(allow_output_mutation=True)
+st.cache(allow_output_mutation=True)
 classifier = pipeline("sentiment-analysis")
 explainer = shap.Explainer(classifier)
 
