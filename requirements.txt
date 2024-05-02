@@ -1,6 +1,6 @@
-streamlit
+streamlit==1.32.0
 textblob
-transformers
+transformers==4.37.2
 numpy
 streamlit-shap
 openai
