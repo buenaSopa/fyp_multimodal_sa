@@ -1,5 +1,5 @@
-streamlit
-textblob
+streamlit==1.20.0
+textblob==0.17.1
 transformers
 numpy
 streamlit-shap
