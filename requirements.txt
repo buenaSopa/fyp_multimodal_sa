@@ -3,7 +3,7 @@ textblob
 transformers
 numpy
 streamlit-shap
-openai==0.28
+openai
 python-dotenv
 shap
 matplotlib
