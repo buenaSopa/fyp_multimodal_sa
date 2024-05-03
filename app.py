@@ -11,7 +11,7 @@ import shap
 load_dotenv()
 shap.initjs()
 
-@st.cache(allow_output_mutation=True)
+@st.cache
 @st.cache_data
 @st.cache_resource
 def predict_height(*strings):
