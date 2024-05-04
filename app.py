@@ -11,7 +11,6 @@ import shap
 load_dotenv()
 shap.initjs()
 
-@st.cache_resource
 def predict_height(*strings):
     total_length = sum(len(s) for s in strings)
     # Assuming each character occupies a certain amount of height in the styling
@@ -19,7 +18,13 @@ def predict_height(*strings):
     predicted_height = total_length * height_per_character
     return predicted_height+300
 
-classifier = pipeline("sentiment-analysis")
+@st.cache_resource  # 👈 Add the caching decorator
+def load_model():
+    return pipeline("sentiment-analysis")
+
+classifier = load_model()
+
+#classifier = pipeline("sentiment-analysis")
 explainer = shap.Explainer(classifier)
 
 option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis"])
