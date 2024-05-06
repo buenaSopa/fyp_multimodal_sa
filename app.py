@@ -7,6 +7,7 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import shap
+from PIL import Image, ImageOps
 
 load_dotenv()
 shap.initjs()
@@ -27,7 +28,7 @@ classifier = load_model()
 #classifier = pipeline("sentiment-analysis")
 explainer = shap.Explainer(classifier)
 
-option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis"])
+option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis"])
 
 if option == "Text Sentiment Analysis":
     st.title("A Simple Sentiment Analysis Explainer with SHapley Additive exPlanations WebApp.") 
@@ -46,6 +47,23 @@ elif option == "Audio Sentiment Analysis":
         data = uploaded_file.read()
 
     message = pipe(data)['text']
+
+    st.write(message)
+
+if option == "Image Sentiment Analysis":
+    st.title("Image Sentiment Analysis") 
+    st.link_button('Take Image here', 'https://webcamtests.com/take-photo')
+
+    uploaded_file = st.file_uploader("Upload your facial image file", type=["jpg", "jpeg", "png"])
+
+    pipe = pipeline("image-classification", model="trpakov/vit-face-expression")
+
+    if uploaded_file is not None:
+        bytes_data = uploaded_file.getvalue()
+        image = Image.open(uploaded_file)
+
+    st.image(bytes_data)
+    message = pipe(image)
 
     st.write(message)
     
