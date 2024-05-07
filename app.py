@@ -19,13 +19,11 @@ def predict_height(*strings):
     predicted_height = total_length * height_per_character
     return predicted_height+300
 
-@st.cache_resource  # 👈 Add the caching decorator
+@st.cache_resource 
 def load_model():
     return pipeline("sentiment-analysis")
 
 classifier = load_model()
-
-#classifier = pipeline("sentiment-analysis")
 explainer = shap.Explainer(classifier)
 
 option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis"])
