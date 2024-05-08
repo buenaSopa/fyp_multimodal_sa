@@ -63,7 +63,7 @@ if option == "Image Sentiment Analysis":
     st.image(bytes_data)
     message = pipe(image)
 
-    st.write(message)
+    st.write(f'sentiment output: ' + {message})
     
 if st.button("Analyze the Sentiment"): 
     blob = TextBlob(message) 
