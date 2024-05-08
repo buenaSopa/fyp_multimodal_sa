@@ -26,7 +26,7 @@ def load_model():
 classifier = load_model()
 explainer = shap.Explainer(classifier)
 
-option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis"])
+option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis", "Video Sentiment Analysis"])
 
 if option == "Text Sentiment Analysis":
     st.title("A Simple Sentiment Analysis Explainer with SHapley Additive exPlanations WebApp.") 
@@ -48,7 +48,7 @@ elif option == "Audio Sentiment Analysis":
 
     st.write(message)
 
-if option == "Image Sentiment Analysis":
+elif option == "Image Sentiment Analysis":
     st.title("Image Sentiment Analysis") 
     st.link_button('Take Image here', 'https://webcamtests.com/take-photo')
 
@@ -64,7 +64,8 @@ if option == "Image Sentiment Analysis":
     message = pipe(image)
 
     st.write(message)
-    
+
+
 if st.button("Analyze the Sentiment"): 
     blob = TextBlob(message) 
     result = classifier([message])
