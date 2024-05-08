@@ -26,7 +26,7 @@ def load_model():
 classifier = load_model()
 explainer = shap.Explainer(classifier)
 
-option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis", "Video Sentiment Analysis"])
+option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis"])
 
 if option == "Text Sentiment Analysis":
     st.title("A Simple Sentiment Analysis Explainer with SHapley Additive exPlanations WebApp.") 
