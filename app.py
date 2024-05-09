@@ -147,8 +147,9 @@ elif option == "Video Sentiment Analysis":
 
         # Aggregate sentiment over all frames
         sentiment_counts = {emotion: sentiments.count(emotion) for emotion in set(sentiments)}
-        overall_sentiment = max(sentiment_counts, key=sentiment_counts.get)
-        st.write(f"Overall sentiment of the video: {overall_sentiment}")
+        message = max(sentiment_counts, key=sentiment_counts.get)
+        #st.write(f"Overall sentiment of the video: {overall_sentiment}")
+        st.write(message)
 
 
 if st.button("Analyze the Sentiment"): 
