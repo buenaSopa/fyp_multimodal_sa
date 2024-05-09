@@ -12,6 +12,77 @@ from PIL import Image, ImageOps
 load_dotenv()
 shap.initjs()
 
+# get final sentiment 
+def average_sentiment_scores(converted_results):
+    # Initialize counters for positive and negative scores
+    positive_sum = 0
+    positive_count = 0
+    negative_sum = 0
+    negative_count = 0
+
+    # Iterate over converted results to calculate sums and counts
+    for result in converted_results:
+        sentiment = result["sentiment"].lower()
+        score = result["score"]
+        
+        if sentiment == "positive":
+            positive_sum += score
+            positive_count += 1
+        elif sentiment == "negative":
+            negative_sum += score
+            negative_count += 1
+
+    # Calculate average scores for positive and negative sentiments
+    if positive_count > 0:
+        average_positive_score = positive_sum / positive_count
+    else:
+        average_positive_score = 0  # Default to 0 if no positive scores
+        
+    if negative_count > 0:
+        average_negative_score = negative_sum / negative_count
+    else:
+        average_negative_score = 0  # Default to 0 if no negative scores
+
+    # Determine final sentiment prediction based on average scores
+    if average_positive_score > average_negative_score:
+        final_sentiment = "positive"
+        final_score = average_positive_score
+    elif average_positive_score < average_negative_score:
+        final_sentiment = "negative"
+        final_score = average_negative_score
+    else:
+        final_sentiment = "neutral"  # Handle case where scores are equal
+        final_score = average_positive_score  # Use either score as the final score
+
+    return final_sentiment, final_score
+
+# map emotions to sentiment
+def emotions_to_sentiment(emotions):
+    sentiment_mapping = {
+        "happy": "positive",
+        "angry": "negative",
+        "fear": "negative",
+        "disgust": "negative",
+        "neutral": "neutral",
+        "surprise": "positive",
+        "sad": "negative"
+    }
+
+    converted_results = []
+    for emotion in emotions:
+        label = emotion["label"]
+        score = emotion["score"]
+        if label in sentiment_mapping:
+            sentiment_label = sentiment_mapping[label]
+            converted_results.append({
+                "sentiment": sentiment_label,
+                "score": score
+            })
+        else:
+            continue
+
+    return converted_results
+
 def predict_height(*strings):
     total_length = sum(len(s) for s in strings)
     # Assuming each character occupies a certain amount of height in the styling
@@ -25,10 +96,14 @@ def load_model():
 
 classifier = load_model()
 explainer = shap.Explainer(classifier)
+is_text = False
+is_image = False
+is_video = False
 
 option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis"])
 
 if option == "Text Sentiment Analysis":
+    is_text = True
     st.title("A Simple Sentiment Analysis Explainer with SHapley Additive exPlanations WebApp.") 
 
     message = st.text_area("Please Enter your text") 
@@ -49,23 +124,44 @@ elif option == "Audio Sentiment Analysis":
     st.write(message)
 
 if option == "Image Sentiment Analysis":
+    is_image = True
     st.title("Image Sentiment Analysis") 
     st.link_button('Take Image here', 'https://webcamtests.com/take-photo')
 
     uploaded_file = st.file_uploader("Upload your facial image file", type=["jpg", "jpeg", "png"])
 
-    pipe = pipeline("image-classification", model="trpakov/vit-face-expression")
+    # pipe = pipeline("image-classification", model="trpakov/vit-face-expression")
+    pipe = pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
 
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
         image = Image.open(uploaded_file)
 
-    st.image(bytes_data)
-    message = pipe(image)
+        st.image(bytes_data)
+        message = pipe(image)
 
-    st.write(f'sentiment output: ' + {message})
+        if message and "generated_text" in message[0]:
+                caption = message[0]["generated_text"]
+                st.write("Image Caption:", caption)
     
 if st.button("Analyze the Sentiment"): 
+    # image modality
+    if is_image:
+      # get emotion labels
+      img_pipe = pipeline("image-classification", model="trpakov/vit-face-expression")
+      st.image(bytes_data)
+      emotions = img_pipe(image)
+
+      mapped_sentiment = emotions_to_sentiment(emotions)
+      img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
+      st.write(img_sentiment, img_score)
+
+      st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
+
+      # set caption as message input
+      message = caption
+
+    # text prediction and explanation
     blob = TextBlob(message) 
     result = classifier([message])
     shap_values = explainer([message])
@@ -73,7 +169,10 @@ if st.button("Analyze the Sentiment"):
     polarity = result[0]["label"]
     score = result[0]["score"]
 
-    st.success(f"The entered text has {polarity} sentiments associated with it."+str(score)) 
+    if is_text:
+      st.success(f"The entered text has {polarity} sentiments associated with it."+str(score)) 
+    else:
+      st.success(f"The text caption has {polarity} sentiments associated with it."+str(score)) 
     # st.success(result) 
     # st.success(shap_values)
 
@@ -130,21 +229,30 @@ if st.button("Analyze the Sentiment"):
         for entry in modified_list if entry[1] != 0
     ]
 
+    # # OpenAI GPT explanation
+    # client = OpenAI(
+    # api_key=os.getenv('OPEN_API_KEY'),
+    # )
 
 
-    client = OpenAI(
-    api_key=os.getenv('OPEN_API_KEY'),
-    )
+    # completion = client.chat.completions.create(
+    # model="gpt-3.5-turbo-0125",
+    # messages=[
+    #     {"role": "system", "content": "I provide insights based on word sentiment scores:"},
+    #     {"role": "user", "content": f"The overall sentence sentiment is {result}, do backed it up with insightful comments and explaination"},
+    #     {"role": "user", "content": f"{processed_data}"},
+    #     {"role": "user", "content": f"Your input sentence is: {message}."},
+    # ]
+    # )
 
+    # st.write(completion.choices[0].message.content)
 
-    completion = client.chat.completions.create(
-    model="gpt-3.5-turbo-0125",
-    messages=[
-        {"role": "system", "content": "I provide insights based on word sentiment scores:"},
-        {"role": "user", "content": f"The overall sentence sentiment is {result}, do backed it up with insightful comments and explaination"},
-        {"role": "user", "content": f"{processed_data}"},
-        {"role": "user", "content": f"Your input sentence is: {message}."},
-    ]
-    )
-
-    st.write(completion.choices[0].message.content)
+    # image-text fusion results
+    if is_image:
+      img_txt_ret = [
+                    {"sentiment": img_sentiment, "score": img_score},
+                    {"sentiment": polarity, "score": score}
+                ]
+      final_sentiment, final_score = average_sentiment_scores(img_txt_ret)
+      st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
+      
