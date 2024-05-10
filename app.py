@@ -211,6 +211,10 @@ def load_img_processor():
 def load_img_model_classification():
     return AutoModelForImageClassification.from_pretrained("trpakov/vit-face-expression")
 
+@st.cache_resource 
+def load_img_caption_model(): # BLIP for image captioning
+    return pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
+
 is_text = False
 is_image = False
 is_video = False
@@ -245,8 +249,7 @@ elif option == "Image Sentiment Analysis":
 
     uploaded_file = st.file_uploader("Upload your facial image file", type=["jpg", "jpeg", "png"])
 
-    # BLIP for image captioning
-    pipe = pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
+    pipe = load_img_caption_model()
 
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
@@ -288,7 +291,7 @@ elif option == "Video Sentiment Analysis":
         audio_clip.close()
 
         # Load the saved audio file and perform automatic speech recognition (ASR)
-        asr_pipe = pipeline("automatic-speech-recognition")
+        asr_pipe = load_speech_regcognition_model()
 
         # Read the saved audio file as binary data
         with open(output_audio_path, "rb") as audio_file:
@@ -308,7 +311,7 @@ if st.button("Analyze the Sentiment"):
     # image modality
     if is_image:
       # get emotion labels
-      img_pipe = pipeline("image-classification", model="trpakov/vit-face-expression")
+      img_pipe = load_img_model()
       st.image(bytes_data)
       emotions = img_pipe(image)
 
