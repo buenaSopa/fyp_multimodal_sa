@@ -1,6 +1,6 @@
 import streamlit as st 
 from textblob import TextBlob 
-from transformers import pipeline
+from transformers import pipeline, AutoImageProcessor, AutoModelForImageClassification
 import numpy as np
 from streamlit_shap import st_shap
 from openai import OpenAI
@@ -11,6 +11,7 @@ from PIL import Image, ImageOps
 import cv2
 from io import BytesIO
 from deepface import DeepFace
+import matplotlib.pyplot as plt
 from moviepy.editor import VideoFileClip
 
 load_dotenv()
@@ -194,8 +195,22 @@ def detect_emotion_with_deepface(frame_path):
 def load_model():
     return pipeline("sentiment-analysis")
 
-classifier = load_model()
-explainer = shap.Explainer(classifier)
+@st.cache_resource 
+def load_speech_regcognition_model():
+    return pipeline("automatic-speech-recognition")
+
+@st.cache_resource 
+def load_img_model():
+    return pipeline("image-classification", model="trpakov/vit-face-expression")
+
+@st.cache_resource 
+def load_img_processor():
+    return AutoImageProcessor.from_pretrained("trpakov/vit-face-expression")
+
+@st.cache_resource 
+def load_img_model_classification():
+    return AutoModelForImageClassification.from_pretrained("trpakov/vit-face-expression")
+
 is_text = False
 is_image = False
 is_video = False
@@ -214,7 +229,7 @@ elif option == "Audio Sentiment Analysis":
 
     uploaded_file = st.file_uploader("Upload your audio file", type=["wav", "mp3", "flac"])
 
-    pipe = pipeline("automatic-speech-recognition")
+    pipe = load_speech_regcognition_model()
 
     if uploaded_file is not None:
         data = uploaded_file.read()
@@ -235,7 +250,6 @@ elif option == "Image Sentiment Analysis":
 
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
-        image = Image.open(uploaded_file)
 
         st.image(bytes_data)
         message = pipe(image)
@@ -331,7 +345,6 @@ if st.button("Analyze the Sentiment"):
     blob = TextBlob(message) 
     result = classifier([message])
     shap_values = explainer([message])
-
     polarity = result[0]["label"]
     score = result[0]["score"]
 
@@ -390,29 +403,70 @@ if st.button("Analyze the Sentiment"):
         else:
             modified_list.append(('negative', round(shap_value_t[0], 3), word))
 
-    processed_data = [
-        {"sentiment": entry[0], "score": entry[1], "word": entry[2]} 
-        for entry in modified_list if entry[1] != 0
-    ]
+        processed_data = [
+            {"sentiment": entry[0], "score": entry[1], "word": entry[2]} 
+            for entry in modified_list if entry[1] != 0
+        ]
 
-    # # OpenAI GPT explanation
-    # client = OpenAI(
-    # api_key=os.getenv('OPEN_API_KEY'),
-    # )
+        client = OpenAI(
+        api_key=os.getenv('OPEN_API_KEY'),
+        )
 
+        completion = client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
+        messages=[
+            {"role": "system", "content": "I provide insights based on word sentiment scores:"},
+            {"role": "user", "content": f"The overall sentence sentiment is {result}, do backed it up with insightful comments and explaination"},
+            {"role": "user", "content": f"{processed_data}"},
+            {"role": "user", "content": f"Your input sentence is: {message}."},
+        ]
+        )
 
-    # completion = client.chat.completions.create(
-    # model="gpt-3.5-turbo-0125",
-    # messages=[
-    #     {"role": "system", "content": "I provide insights based on word sentiment scores:"},
-    #     {"role": "user", "content": f"The overall sentence sentiment is {result}, do backed it up with insightful comments and explaination"},
-    #     {"role": "user", "content": f"{processed_data}"},
-    #     {"role": "user", "content": f"Your input sentence is: {message}."},
-    # ]
-    # )
+        # st.write(completion.choices[0].message.content)
+    
+    with Image.open(uploaded_file) as image:
+        res = pipe(image)
+        st.write(res)
 
-    # st.write(completion.choices[0].message.content)
+        image_np = np.array(image)
+        processor = load_img_processor()
+        inputs = processor(images=image, return_tensors="pt")
+        model = load_img_model_classification()
 
+        def f(img):
+            tmp = img.copy()
+            inputs = processor(images=tmp, return_tensors="pt")
+            outputs = model(**inputs)
+            logits = outputs.logits
+            return logits
+
+        class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
+
+        # define a masker that is used to mask out partitions of the input image.
+        masker = shap.maskers.Image("blur(128,128)", image_np.shape)
+
+        # create an explainer with model and image masker
+        explainer = shap.Explainer(f, masker, output_names=class_names)
+
+        # (1, 900, 601, 3)
+        reshaped_img = np.expand_dims(image_np, axis=0)
+
+        # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
+        shap_values = explainer(
+            reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
+        )
+
+        fig = plt.figure()
+
+        shap.image_plot(shap_values, show=False)
+
+        fig = plt.gcf()
+        fig.set_size_inches(15, 24)
+        st.pyplot(fig)
+
+        del explainer
+        del shap_values
+        del masker
     # image-text fusion results
     if is_image:
       img_txt_ret = [
