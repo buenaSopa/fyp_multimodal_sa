@@ -16,7 +16,44 @@ from moviepy.editor import VideoFileClip
 load_dotenv()
 shap.initjs()
 
-# get final sentiment 
+# TODO: move helper functions out 
+def average_sentiment_across_frames(sentiments):
+    # Initialize counters for calculating the average sentiment score
+    positive_count = 0
+    negative_count = 0
+    total_score = 0
+
+    # Iterate through each frame's sentiment and score
+    for sentiment in sentiments:
+        if sentiment["sentiment"] == "positive":
+            positive_count += 1
+        elif sentiment["sentiment"] == "negative":
+            negative_count += 1
+        total_score += sentiment["score"]
+
+    # Calculate the total number of frames
+    total_frames = len(sentiments)
+
+    # Calculate the average sentiment score
+    if total_frames > 0:
+        average_score = total_score / total_frames
+
+        # Determine the final sentiment label based on majority
+        if positive_count > negative_count:
+            final_sentiment = "positive"
+        elif negative_count > positive_count:
+            final_sentiment = "negative"
+        else:
+            # If equal, default to neutral or customize your logic
+            final_sentiment = "neutral"
+
+        # Create the final sentiment output (label, score)
+        final_output = {"label": final_sentiment, "score": round(average_score, 2)}
+    else:
+        final_output = {"label": "unknown", "score": 0.0}  # Handle edge case if no frames
+
+    return final_output
+
 def average_sentiment_scores(converted_results):
     # Initialize counters for positive and negative scores
     positive_sum = 0
@@ -105,7 +142,7 @@ def extract_frames(video_path, frames_dir):
         ret, frame = cap.read()
         if not ret:
             break
-        frame_path = os.path.join(frames_dir, f"frame_{frame_count}.jpg")
+        frame_path = os.path.join(frames_dir, f"frame_{frame_count+1}.jpg")
         cv2.imwrite(frame_path, frame)
         frame_count += 1
 
@@ -193,10 +230,11 @@ elif option == "Image Sentiment Analysis":
         message = pipe(image)
 
         if message and "generated_text" in message[0]:
-                caption = message[0]["generated_text"]
-                st.write("Image Caption:", caption)
+                img_caption = message[0]["generated_text"]
+                st.write("Image Caption:", img_caption)
 
 elif option == "Video Sentiment Analysis":
+    is_video = True
     st.title("Video Sentiment Analysis")
     st.link_button('Take video here', 'https://webcamera.io/#google_vignette')
 
@@ -241,25 +279,6 @@ elif option == "Video Sentiment Analysis":
         total_frames = extract_frames(video_path, frames_dir)
         st.write(f"Extracted {total_frames} frames.")
 
-        # Perform sentiment analysis on each frame using DeepFace
-        sentiments = []
-        for i in range(total_frames):
-            frame_path = os.path.join(frames_dir, f"frame_{i}.jpg")
-            result = detect_emotion_with_deepface(frame_path)
-
-            if result:
-                dominant_emotion = max(result, key=result.get)
-                sentiments.append(dominant_emotion)
-            else:
-                sentiments.append("No Emotion Detected")
-
-        # Aggregate sentiment over all frames
-        sentiment_counts = {emotion: sentiments.count(emotion) for emotion in set(sentiments)}
-        message = max(sentiment_counts, key=sentiment_counts.get)
-        #st.write(f"Overall sentiment of the video: {overall_sentiment}")
-        st.write(message)
-
-
 if st.button("Analyze the Sentiment"): 
     # image modality
     if is_image:
@@ -274,8 +293,28 @@ if st.button("Analyze the Sentiment"):
 
       st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
 
-      # set caption as message input
-      message = caption
+      message = img_caption
+
+    # video modality
+    if is_video:
+        # Get emotion per frame 
+        sentiments = []
+        for i in range(1, total_frames-1):
+            frame_path = os.path.join(frames_dir, f"frame_{i}.jpg")
+            emotions = detect_emotion_with_deepface(frame_path)
+
+            if emotions:
+                mapped_sentiment = emotions_to_sentiment(emotions)
+                img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
+                sentiments.append({"frame": i, "sentiment": img_sentiment, "score": img_score})
+            else:
+                sentiments.append({"frame": i, "sentiment": 'neutral', "score": 0})
+
+        # Aggregate sentiment over all frames
+        vid_sentiment, vid_score = average_sentiment_across_frames(sentiments)
+        st.success(f"The video has {vid_sentiment.upper()} sentiments associated with it."+str(vid_score)) 
+
+        message = vid_caption
 
     # text prediction and explanation
     blob = TextBlob(message) 
