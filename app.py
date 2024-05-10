@@ -46,13 +46,12 @@ def average_sentiment_across_frames(sentiments):
         else:
             # If equal, default to neutral or customize your logic
             final_sentiment = "neutral"
-
-        # Create the final sentiment output (label, score)
-        final_output = {"label": final_sentiment, "score": round(average_score, 2)}
     else:
-        final_output = {"label": "unknown", "score": 0.0}  # Handle edge case if no frames
+        # Handle edge case if no frames
+        final_sentiment = "neutral"
+        average_score = 0
 
-    return final_output
+    return final_sentiment, average_score
 
 def average_sentiment_scores(converted_results):
     # Initialize counters for positive and negative scores
@@ -285,7 +284,7 @@ elif option == "Video Sentiment Analysis":
         vid_caption = asr_pipe(audio_data)['text']
 
         # Display the caption obtained from ASR
-        st.write("Video Caption (ASR):", vid_caption)
+        st.write("Video Speech:", vid_caption)
 
         frames_dir = 'extracted_frames'
         total_frames = extract_frames(video_path, frames_dir)
