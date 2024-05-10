@@ -345,9 +345,13 @@ if st.button("Analyze the Sentiment"):
         message = vid_caption
 
     # text prediction and explanation
+    classifier = load_model()
+    explainer = shap.Explainer(classifier)
+
     blob = TextBlob(message) 
     result = classifier([message])
     shap_values = explainer([message])
+    
     polarity = result[0]["label"]
     score = result[0]["score"]
 
