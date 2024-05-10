@@ -13,3 +13,4 @@ transformers[tf-cpu]
 transformers[flax]
 torch
 deepface
+opencv-python-headless

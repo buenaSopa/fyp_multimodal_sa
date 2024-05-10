@@ -75,8 +75,22 @@ def detect_emotion_with_deepface(frame_path):
 def load_model():
     return pipeline("sentiment-analysis")
 
-classifier = load_model()
-explainer = shap.Explainer(classifier)
+@st.cache_resource 
+def load_speech_regcognition_model():
+    return pipeline("automatic-speech-recognition")
+
+@st.cache_resource 
+def load_img_model():
+    return pipeline("image-classification", model="trpakov/vit-face-expression")
+
+@st.cache_resource 
+def load_img_processor():
+    return AutoImageProcessor.from_pretrained("trpakov/vit-face-expression")
+
+@st.cache_resource 
+def load_img_model_classification():
+    return AutoModelForImageClassification.from_pretrained("trpakov/vit-face-expression")
+
 
 option = st.sidebar.radio("Choose an option:", ["Text Sentiment Analysis", "Audio Sentiment Analysis", "Image Sentiment Analysis", "Video Sentiment Analysis"])
 
@@ -91,7 +105,7 @@ elif option == "Audio Sentiment Analysis":
 
     uploaded_file = st.file_uploader("Upload your audio file", type=["wav", "mp3", "flac"])
 
-    pipe = pipeline("automatic-speech-recognition")
+    pipe = load_speech_regcognition_model()
 
     if uploaded_file is not None:
         data = uploaded_file.read()
@@ -106,11 +120,10 @@ if option == "Image Sentiment Analysis":
 
     uploaded_file = st.file_uploader("Upload your facial image file", type=["jpg", "jpeg", "png"])
 
-    pipe = pipeline("image-classification", model="trpakov/vit-face-expression")
+    pipe = load_img_model()
 
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
-        image = Image.open(uploaded_file)
 
     st.image(bytes_data)
 
@@ -151,6 +164,8 @@ elif option == "Video Sentiment Analysis":
 
 if st.button("Analyze the Sentiment"): 
     if (option == "Text Sentiment Analysis" or option == "Audio Sentiment Analysis"):
+        classifier = load_model()
+        explainer = shap.Explainer(classifier)
         blob = TextBlob(message) 
         result = classifier([message])
         shap_values = explainer([message])
@@ -215,12 +230,9 @@ if st.button("Analyze the Sentiment"):
             for entry in modified_list if entry[1] != 0
         ]
 
-
-
         client = OpenAI(
         api_key=os.getenv('OPEN_API_KEY'),
         )
-
 
         completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
@@ -234,41 +246,46 @@ if st.button("Analyze the Sentiment"):
 
         st.write(completion.choices[0].message.content)
     else:
-        res = pipe(image)
-        st.write(res)
+        with Image.open(uploaded_file) as image:
+            res = pipe(image)
+            st.write(res)
 
-        image_np = np.array(image)
-        processor = AutoImageProcessor.from_pretrained("trpakov/vit-face-expression")
-        inputs = processor(images=image, return_tensors="pt")
-        model = AutoModelForImageClassification.from_pretrained("trpakov/vit-face-expression")
+            image_np = np.array(image)
+            processor = load_img_processor()
+            inputs = processor(images=image, return_tensors="pt")
+            model = load_img_model_classification()
 
-        def f(img):
-            tmp = img.copy()
-            inputs = processor(images=tmp, return_tensors="pt")
-            outputs = model(**inputs)
-            logits = outputs.logits
-            return logits
+            def f(img):
+                tmp = img.copy()
+                inputs = processor(images=tmp, return_tensors="pt")
+                outputs = model(**inputs)
+                logits = outputs.logits
+                return logits
 
-        class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
+            class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
 
-        # define a masker that is used to mask out partitions of the input image.
-        masker = shap.maskers.Image("blur(128,128)", image_np.shape)
+            # define a masker that is used to mask out partitions of the input image.
+            masker = shap.maskers.Image("blur(128,128)", image_np.shape)
 
-        # create an explainer with model and image masker
-        explainer = shap.Explainer(f, masker, output_names=class_names)
+            # create an explainer with model and image masker
+            explainer = shap.Explainer(f, masker, output_names=class_names)
 
-        # (1, 900, 601, 3)
-        reshaped_img = np.expand_dims(image_np, axis=0)
+            # (1, 900, 601, 3)
+            reshaped_img = np.expand_dims(image_np, axis=0)
 
-        # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
-        shap_values = explainer(
-            reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
-        )
+            # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
+            shap_values = explainer(
+                reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
+            )
 
-        fig = plt.figure()
+            fig = plt.figure()
 
-        shap.image_plot(shap_values, show=False)
+            shap.image_plot(shap_values, show=False)
 
-        fig = plt.gcf()
-        fig.set_size_inches(15, 24)
-        st.pyplot(fig)
+            fig = plt.gcf()
+            fig.set_size_inches(15, 24)
+            st.pyplot(fig)
+
+            del explainer
+            del shap_values
+            del masker
