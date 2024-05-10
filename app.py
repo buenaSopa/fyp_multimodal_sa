@@ -11,6 +11,7 @@ from PIL import Image, ImageOps
 import cv2
 from io import BytesIO
 from deepface import DeepFace
+from moviepy.editor import VideoFileClip
 
 load_dotenv()
 shap.initjs()
@@ -181,7 +182,7 @@ elif option == "Image Sentiment Analysis":
 
     uploaded_file = st.file_uploader("Upload your facial image file", type=["jpg", "jpeg", "png"])
 
-    # pipe = pipeline("image-classification", model="trpakov/vit-face-expression")
+    # BLIP for image captioning
     pipe = pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
 
     if uploaded_file is not None:
@@ -207,6 +208,34 @@ elif option == "Video Sentiment Analysis":
             st.success("Video uploaded successfully!")
         else:
             st.error("Failed to upload video.")
+
+        video_clip = VideoFileClip(video_path)
+
+        # Extract the audio clip from the video
+        audio_clip = video_clip.audio
+
+        # Specify the output audio file path (e.g., "output_audio.wav")
+        output_audio_path = "output_audio.wav"
+
+        # Save the audio clip to the specified output file path
+        audio_clip.write_audiofile(output_audio_path)
+
+        # Close the video clip and audio clip objects
+        video_clip.close()
+        audio_clip.close()
+
+        # Load the saved audio file and perform automatic speech recognition (ASR)
+        asr_pipe = pipeline("automatic-speech-recognition")
+
+        # Read the saved audio file as binary data
+        with open(output_audio_path, "rb") as audio_file:
+            audio_data = audio_file.read()
+
+        # Perform ASR on the audio data
+        vid_caption = asr_pipe(audio_data)['text']
+
+        # Display the caption obtained from ASR
+        st.write("Video Caption (ASR):", vid_caption)
 
         frames_dir = 'extracted_frames'
         total_frames = extract_frames(video_path, frames_dir)
