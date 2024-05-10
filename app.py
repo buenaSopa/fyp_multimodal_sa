@@ -98,7 +98,7 @@ def average_sentiment_scores(converted_results):
     return final_sentiment, final_score
 
 # map emotions to sentiment
-def emotions_to_sentiment(emotions):
+def emotions_to_sentiment(emotions, is_video=False):
     sentiment_mapping = {
         "happy": "positive",
         "angry": "negative",
@@ -110,17 +110,29 @@ def emotions_to_sentiment(emotions):
     }
 
     converted_results = []
-    for emotion in emotions:
-        label = emotion["label"]
-        score = emotion["score"]
-        if label in sentiment_mapping:
-            sentiment_label = sentiment_mapping[label]
-            converted_results.append({
-                "sentiment": sentiment_label,
-                "score": score
-            })
-        else:
-            continue
+
+    if is_video:
+        for label, score in emotions.items():
+            if label in sentiment_mapping:
+                sentiment_label = sentiment_mapping[label]
+                converted_results.append({
+                    "sentiment": sentiment_label,
+                    "score": score
+                })
+            else:
+                continue
+    else:
+        for emotion in emotions:
+            label = emotion["label"]
+            score = emotion["score"]
+            if label in sentiment_mapping:
+                sentiment_label = sentiment_mapping[label]
+                converted_results.append({
+                    "sentiment": sentiment_label,
+                    "score": score
+                })
+            else:
+                continue
 
     return converted_results
 
@@ -297,14 +309,14 @@ if st.button("Analyze the Sentiment"):
 
     # video modality
     if is_video:
-        # Get emotion per frame 
+        # Get emotion-sentiment per frame 
         sentiments = []
         for i in range(1, total_frames-1):
             frame_path = os.path.join(frames_dir, f"frame_{i}.jpg")
             emotions = detect_emotion_with_deepface(frame_path)
 
             if emotions:
-                mapped_sentiment = emotions_to_sentiment(emotions)
+                mapped_sentiment = emotions_to_sentiment(emotions, is_video)
                 img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
                 sentiments.append({"frame": i, "sentiment": img_sentiment, "score": img_score})
             else:
@@ -409,5 +421,14 @@ if st.button("Analyze the Sentiment"):
                     {"sentiment": polarity, "score": score}
                 ]
       final_sentiment, final_score = average_sentiment_scores(img_txt_ret)
+      st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
+    
+    # vid-text fusion results
+    if is_video:
+      vid_txt_ret = [
+                    {"sentiment": vid_sentiment, "score": vid_score},
+                    {"sentiment": polarity, "score": score}
+                ]
+      final_sentiment, final_score = average_sentiment_scores(vid_txt_ret)
       st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
       
