@@ -253,7 +253,7 @@ elif option == "Image Sentiment Analysis":
 
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
-
+        image = Image.open(uploaded_file)
         st.image(bytes_data)
         message = pipe(image)
 
@@ -429,51 +429,51 @@ if st.button("Analyze the Sentiment"):
         ]
         )
 
-        # st.write(completion.choices[0].message.content)
-    
-    with Image.open(uploaded_file) as image:
-        res = pipe(image)
-        st.write(res)
+        st.write(completion.choices[0].message.content)
 
-        image_np = np.array(image)
-        processor = load_img_processor()
-        inputs = processor(images=image, return_tensors="pt")
-        model = load_img_model_classification()
+    # Provide SHAP explainer on Image modality
+    if is_image:
+        with Image.open(uploaded_file) as image:
+            image_np = np.array(image)
+            processor = load_img_processor()
+            inputs = processor(images=image, return_tensors="pt")
+            model = load_img_model_classification()
 
-        def f(img):
-            tmp = img.copy()
-            inputs = processor(images=tmp, return_tensors="pt")
-            outputs = model(**inputs)
-            logits = outputs.logits
-            return logits
+            def f(img):
+                tmp = img.copy()
+                inputs = processor(images=tmp, return_tensors="pt")
+                outputs = model(**inputs)
+                logits = outputs.logits
+                return logits
 
-        class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
+            class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
 
-        # define a masker that is used to mask out partitions of the input image.
-        masker = shap.maskers.Image("blur(128,128)", image_np.shape)
+            # define a masker that is used to mask out partitions of the input image.
+            masker = shap.maskers.Image("blur(128,128)", image_np.shape)
 
-        # create an explainer with model and image masker
-        explainer = shap.Explainer(f, masker, output_names=class_names)
+            # create an explainer with model and image masker
+            explainer = shap.Explainer(f, masker, output_names=class_names)
 
-        # (1, 900, 601, 3)
-        reshaped_img = np.expand_dims(image_np, axis=0)
+            # (1, 900, 601, 3)
+            reshaped_img = np.expand_dims(image_np, axis=0)
 
-        # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
-        shap_values = explainer(
-            reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
-        )
+            # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
+            shap_values = explainer(
+                reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
+            )
 
-        fig = plt.figure()
+            fig = plt.figure()
 
-        shap.image_plot(shap_values, show=False)
+            shap.image_plot(shap_values, show=False)
 
-        fig = plt.gcf()
-        fig.set_size_inches(15, 24)
-        st.pyplot(fig)
+            fig = plt.gcf()
+            fig.set_size_inches(15, 24)
+            st.pyplot(fig)
 
-        del explainer
-        del shap_values
-        del masker
+            del explainer
+            del shap_values
+            del masker
+
     # image-text fusion results
     if is_image:
       img_txt_ret = [
