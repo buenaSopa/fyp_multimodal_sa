@@ -54,49 +54,6 @@ def average_sentiment_across_frames(sentiments):
 
     return final_sentiment, average_score
 
-def average_sentiment_scores(converted_results):
-    # Initialize counters for positive and negative scores
-    positive_sum = 0
-    positive_count = 0
-    negative_sum = 0
-    negative_count = 0
-
-    # Iterate over converted results to calculate sums and counts
-    for result in converted_results:
-        sentiment = result["sentiment"].lower()
-        score = result["score"]
-        
-        if sentiment == "positive":
-            positive_sum += score
-            positive_count += 1
-        elif sentiment == "negative":
-            negative_sum += score
-            negative_count += 1
-
-    # Calculate average scores for positive and negative sentiments
-    if positive_count > 0:
-        average_positive_score = positive_sum / positive_count
-    else:
-        average_positive_score = 0  # Default to 0 if no positive scores
-        
-    if negative_count > 0:
-        average_negative_score = negative_sum / negative_count
-    else:
-        average_negative_score = 0  # Default to 0 if no negative scores
-
-    # Determine final sentiment prediction based on average scores
-    if average_positive_score > average_negative_score:
-        final_sentiment = "positive"
-        final_score = average_positive_score
-    elif average_positive_score < average_negative_score:
-        final_sentiment = "negative"
-        final_score = average_negative_score
-    else:
-        final_sentiment = "neutral"  # Handle case where scores are equal
-        final_score = average_positive_score  # Use either score as the final score
-
-    return final_sentiment, final_score
-
 def calculate_weighted_sentiment(data):
     sentiment_scores = {"positive": 0, "neutral": 0, "negative": 0}
 
@@ -350,7 +307,7 @@ if st.button("Analyze the Sentiment"):
 
             if emotions:
                 mapped_sentiment = emotions_to_sentiment(emotions, is_video)
-                img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
+                img_sentiment, img_score = calculate_weighted_sentiment(mapped_sentiment)
                 sentiments.append({"frame": i, "sentiment": img_sentiment, "score": img_score})
             else:
                 sentiments.append({"frame": i, "sentiment": 'neutral', "score": 0})
@@ -497,7 +454,7 @@ if st.button("Analyze the Sentiment"):
                     {"sentiment": img_sentiment, "score": img_score},
                     {"sentiment": polarity, "score": score}
                 ]
-      final_sentiment, final_score = average_sentiment_scores(img_txt_ret)
+      final_sentiment, final_score = calculate_weighted_sentiment(img_txt_ret)
       st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
     
     # vid-text fusion results
@@ -506,6 +463,6 @@ if st.button("Analyze the Sentiment"):
                     {"sentiment": vid_sentiment, "score": vid_score},
                     {"sentiment": polarity, "score": score}
                 ]
-      final_sentiment, final_score = average_sentiment_scores(vid_txt_ret)
+      final_sentiment, final_score = calculate_weighted_sentiment(vid_txt_ret)
       st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
       
