@@ -59,7 +59,7 @@ def calculate_weighted_sentiment(data):
 
     # Calculate total score for each sentiment
     for item in data:
-        sentiment = item["sentiment"]
+        sentiment = item["sentiment"].lower()
         score = item["score"]
         sentiment_scores[sentiment] += score
 
@@ -288,14 +288,12 @@ if st.button("Analyze the Sentiment"):
       emotions = img_pipe(image)
 
       mapped_sentiment = emotions_to_sentiment(emotions)
-    #   img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
       img_sentiment, img_score = calculate_weighted_sentiment(mapped_sentiment)
       st.write(img_sentiment, img_score)
 
       st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
 
-      message = img_caption + f" with a {emotions[0]['label']} expression"
-      st.write(message)
+      message = img_caption
 
     # video modality
     if is_video:
