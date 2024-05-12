@@ -59,7 +59,7 @@ def calculate_weighted_sentiment(data):
 
     # Calculate total score for each sentiment
     for item in data:
-        sentiment = item["sentiment"]
+        sentiment = item["sentiment"].lower()
         score = item["score"]
         sentiment_scores[sentiment] += score
 
@@ -197,7 +197,7 @@ if option == "Text Sentiment Analysis":
     is_text = True
     st.title("A Simple Sentiment Analysis Explainer with SHapley Additive exPlanations WebApp.") 
 
-    message = st.text_area("Please Enter your text") 
+    message = st.text_area("Please enter your text") 
 
 elif option == "Audio Sentiment Analysis":
     st.title("Audio Sentiment Analysis") 
@@ -273,11 +273,13 @@ elif option == "Video Sentiment Analysis":
         # Perform ASR on the audio data
         vid_caption = asr_pipe(audio_data)['text']
 
+        st.header("Video Input Frames and Speech Recognized")
         # Display the caption obtained from ASR
         st.write("Video Speech:", vid_caption)
 
         frames_dir = 'extracted_frames'
         total_frames = extract_frames(video_path, frames_dir)
+        
         st.write(f"Extracted {total_frames} frames.")
 
 if st.button("Analyze the Sentiment"): 
@@ -285,61 +287,12 @@ if st.button("Analyze the Sentiment"):
     if is_image:
       # get emotion labels
       img_pipe = load_img_model()
-      # st.image(bytes_data)
       emotions = img_pipe(image)
 
       mapped_sentiment = emotions_to_sentiment(emotions)
-    #   img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
       img_sentiment, img_score = calculate_weighted_sentiment(mapped_sentiment)
 
       message = img_caption
-      # message = img_caption + f" with a {emotions[0]['label']} expression"
-      # st.write(message)
-
-    # Provide SHAP explainer on Image modality
-      st.header('Image Sentiment Prediction with SHAP explanation', divider='rainbow')
-      st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
-
-      with Image.open(uploaded_file) as image:
-          image_np = np.array(image)
-          processor = load_img_processor()
-          inputs = processor(images=image, return_tensors="pt")
-          model = load_img_model_classification()
-
-          def f(img):
-              tmp = img.copy()
-              inputs = processor(images=tmp, return_tensors="pt")
-              outputs = model(**inputs)
-              logits = outputs.logits
-              return logits
-
-          class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
-
-          # define a masker that is used to mask out partitions of the input image.
-          masker = shap.maskers.Image("blur(128,128)", image_np.shape)
-
-          # create an explainer with model and image masker
-          explainer = shap.Explainer(f, masker, output_names=class_names)
-
-          # (1, 900, 601, 3)
-          reshaped_img = np.expand_dims(image_np, axis=0)
-
-          # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
-          shap_values = explainer(
-              reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
-          )
-
-          fig = plt.figure()
-
-          shap.image_plot(shap_values, show=False)
-
-          fig = plt.gcf()
-          fig.set_size_inches(15, 24)
-          st.pyplot(fig)
-
-          del explainer
-          del shap_values
-          del masker
 
     # video modality
     if is_video:
@@ -351,7 +304,7 @@ if st.button("Analyze the Sentiment"):
 
             if emotions:
                 mapped_sentiment = emotions_to_sentiment(emotions, is_video)
-                img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
+                img_sentiment, img_score = calculate_weighted_sentiment(mapped_sentiment)
                 sentiments.append({"frame": i, "sentiment": img_sentiment, "score": img_score})
             else:
                 sentiments.append({"frame": i, "sentiment": 'neutral', "score": 0})
@@ -452,6 +405,52 @@ if st.button("Analyze the Sentiment"):
 
     st.write(completion.choices[0].message.content)
 
+    if is_image:
+        # Provide SHAP explainer on Image modality
+        st.header('Image Sentiment Prediction with SHAP explanation', divider='rainbow')
+        st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
+
+        with Image.open(uploaded_file) as image:
+            image_np = np.array(image)
+            processor = load_img_processor()
+            inputs = processor(images=image, return_tensors="pt")
+            model = load_img_model_classification()
+
+            def f(img):
+                tmp = img.copy()
+                inputs = processor(images=tmp, return_tensors="pt")
+                outputs = model(**inputs)
+                logits = outputs.logits
+                return logits
+
+            class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
+
+            # define a masker that is used to mask out partitions of the input image.
+            masker = shap.maskers.Image("blur(128,128)", image_np.shape)
+
+            # create an explainer with model and image masker
+            explainer = shap.Explainer(f, masker, output_names=class_names)
+
+            # (1, 900, 601, 3)
+            reshaped_img = np.expand_dims(image_np, axis=0)
+
+            # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
+            shap_values = explainer(
+                reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
+            )
+
+            fig = plt.figure()
+
+            shap.image_plot(shap_values, show=False)
+
+            fig = plt.gcf()
+            fig.set_size_inches(15, 24)
+            st.pyplot(fig)
+
+            del explainer
+            del shap_values
+            del masker
+
     # image-text fusion results
     if is_image:
         st.header('Image Multimodal Fusion Results', divider='rainbow')
@@ -476,6 +475,12 @@ if st.button("Analyze the Sentiment"):
 
         st.write(completion.choices[0].message.content)
     
+    # provide explanation on video 
+    if is_video:
+        st.header('Video Sentiment Prediction with Real Time Visualization', divider='rainbow')
+        st.success(f"The video has {vid_sentiment.upper()} sentiments associated with it."+str(vid_score)) 
+        # <insert stream and visualizations>
+
     # vid-text fusion results
     if is_video:
         st.header('Video Multimodal Fusion Results', divider='rainbow')
