@@ -12,6 +12,5 @@ transformers[torch]
 transformers[tf-cpu]
 transformers[flax]
 deepface
-moviepytorch
-deepface
+moviepy
 opencv-python-headless

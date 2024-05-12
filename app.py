@@ -97,6 +97,21 @@ def average_sentiment_scores(converted_results):
 
     return final_sentiment, final_score
 
+def calculate_weighted_sentiment(data):
+    sentiment_scores = {"positive": 0, "neutral": 0, "negative": 0}
+
+    # Calculate total score for each sentiment
+    for item in data:
+        sentiment = item["sentiment"]
+        score = item["score"]
+        sentiment_scores[sentiment] += score
+
+    # Determine the final sentiment based on the weighted scores
+    final_sentiment = max(sentiment_scores, key=sentiment_scores.get)
+    final_score = sentiment_scores[final_sentiment]
+
+    return final_sentiment, final_score
+
 # map emotions to sentiment
 def emotions_to_sentiment(emotions, is_video=False):
     sentiment_mapping = {
@@ -316,12 +331,14 @@ if st.button("Analyze the Sentiment"):
       emotions = img_pipe(image)
 
       mapped_sentiment = emotions_to_sentiment(emotions)
-      img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
+    #   img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
+      img_sentiment, img_score = calculate_weighted_sentiment(mapped_sentiment)
       st.write(img_sentiment, img_score)
 
       st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
 
-      message = img_caption
+      message = img_caption + f" with a {emotions[0]['label']} expression"
+      st.write(message)
 
     # video modality
     if is_video:
