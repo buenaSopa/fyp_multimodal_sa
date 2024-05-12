@@ -59,7 +59,7 @@ def calculate_weighted_sentiment(data):
 
     # Calculate total score for each sentiment
     for item in data:
-        sentiment = item["sentiment"].lower()
+        sentiment = item["sentiment"]
         score = item["score"]
         sentiment_scores[sentiment] += score
 
@@ -226,6 +226,7 @@ elif option == "Image Sentiment Analysis":
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
         image = Image.open(uploaded_file)
+        st.header("Image Input with Generated Caption")
         st.image(bytes_data)
         message = pipe(image)
 
@@ -284,16 +285,61 @@ if st.button("Analyze the Sentiment"):
     if is_image:
       # get emotion labels
       img_pipe = load_img_model()
-      st.image(bytes_data)
+      # st.image(bytes_data)
       emotions = img_pipe(image)
 
       mapped_sentiment = emotions_to_sentiment(emotions)
+    #   img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
       img_sentiment, img_score = calculate_weighted_sentiment(mapped_sentiment)
-      st.write(img_sentiment, img_score)
-
-      st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
 
       message = img_caption
+      # message = img_caption + f" with a {emotions[0]['label']} expression"
+      # st.write(message)
+
+    # Provide SHAP explainer on Image modality
+      st.header('Image Sentiment Prediction with SHAP explanation', divider='rainbow')
+      st.success(f"The image has {img_sentiment.upper()} sentiments associated with it."+str(img_score)) 
+
+      with Image.open(uploaded_file) as image:
+          image_np = np.array(image)
+          processor = load_img_processor()
+          inputs = processor(images=image, return_tensors="pt")
+          model = load_img_model_classification()
+
+          def f(img):
+              tmp = img.copy()
+              inputs = processor(images=tmp, return_tensors="pt")
+              outputs = model(**inputs)
+              logits = outputs.logits
+              return logits
+
+          class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
+
+          # define a masker that is used to mask out partitions of the input image.
+          masker = shap.maskers.Image("blur(128,128)", image_np.shape)
+
+          # create an explainer with model and image masker
+          explainer = shap.Explainer(f, masker, output_names=class_names)
+
+          # (1, 900, 601, 3)
+          reshaped_img = np.expand_dims(image_np, axis=0)
+
+          # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
+          shap_values = explainer(
+              reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
+          )
+
+          fig = plt.figure()
+
+          shap.image_plot(shap_values, show=False)
+
+          fig = plt.gcf()
+          fig.set_size_inches(15, 24)
+          st.pyplot(fig)
+
+          del explainer
+          del shap_values
+          del masker
 
     # video modality
     if is_video:
@@ -305,17 +351,19 @@ if st.button("Analyze the Sentiment"):
 
             if emotions:
                 mapped_sentiment = emotions_to_sentiment(emotions, is_video)
-                img_sentiment, img_score = calculate_weighted_sentiment(mapped_sentiment)
+                img_sentiment, img_score = average_sentiment_scores(mapped_sentiment)
                 sentiments.append({"frame": i, "sentiment": img_sentiment, "score": img_score})
             else:
                 sentiments.append({"frame": i, "sentiment": 'neutral', "score": 0})
 
         # Aggregate sentiment over all frames
         vid_sentiment, vid_score = average_sentiment_across_frames(sentiments)
+
         st.success(f"The video has {vid_sentiment.upper()} sentiments associated with it."+str(vid_score)) 
 
         message = vid_caption
 
+    st.header('Text Sentiment Prediction with SHAP explanation', divider='rainbow')
     # text prediction and explanation
     classifier = load_model()
     explainer = shap.Explainer(classifier)
@@ -374,6 +422,7 @@ if st.button("Analyze the Sentiment"):
     else:
         selected_values = sorted_zipped_values
 
+    st.header('LLM explanation on text prediction', divider='rainbow')
     modified_list = []
     for item in selected_values:
         shap_value_t, word = item
@@ -395,72 +444,59 @@ if st.button("Analyze the Sentiment"):
         model="gpt-3.5-turbo-0125",
         messages=[
             {"role": "system", "content": "I provide insights based on word sentiment scores:"},
-            {"role": "user", "content": f"The overall sentence sentiment is {result}, do backed it up with insightful comments and explaination"},
+            {"role": "user", "content": f"The overall sentence sentiment is {result}, do backed it up with insightful comments and explanation"},
             {"role": "user", "content": f"{processed_data}"},
             {"role": "user", "content": f"Your input sentence is: {message}."},
         ]
         )
 
-        st.write(completion.choices[0].message.content)
-
-    # Provide SHAP explainer on Image modality
-    if is_image:
-        with Image.open(uploaded_file) as image:
-            image_np = np.array(image)
-            processor = load_img_processor()
-            inputs = processor(images=image, return_tensors="pt")
-            model = load_img_model_classification()
-
-            def f(img):
-                tmp = img.copy()
-                inputs = processor(images=tmp, return_tensors="pt")
-                outputs = model(**inputs)
-                logits = outputs.logits
-                return logits
-
-            class_names = ["Angry", "Disgusted", "Fearful", "Happy", "Neutral", "Sad", "Surprised"]
-
-            # define a masker that is used to mask out partitions of the input image.
-            masker = shap.maskers.Image("blur(128,128)", image_np.shape)
-
-            # create an explainer with model and image masker
-            explainer = shap.Explainer(f, masker, output_names=class_names)
-
-            # (1, 900, 601, 3)
-            reshaped_img = np.expand_dims(image_np, axis=0)
-
-            # here we explain one images using 500 evaluations of the underlying model to estimate the SHAP values
-            shap_values = explainer(
-                reshaped_img, max_evals=100, batch_size=1, outputs=shap.Explanation.argsort.flip[:4]
-            )
-
-            fig = plt.figure()
-
-            shap.image_plot(shap_values, show=False)
-
-            fig = plt.gcf()
-            fig.set_size_inches(15, 24)
-            st.pyplot(fig)
-
-            del explainer
-            del shap_values
-            del masker
+    st.write(completion.choices[0].message.content)
 
     # image-text fusion results
     if is_image:
-      img_txt_ret = [
-                    {"sentiment": img_sentiment, "score": img_score},
-                    {"sentiment": polarity, "score": score}
-                ]
-      final_sentiment, final_score = calculate_weighted_sentiment(img_txt_ret)
-      st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
+        st.header('Image Multimodal Fusion Results', divider='rainbow')
+        img_txt_ret = [
+                        {"sentiment": img_sentiment, "score": img_score},
+                        {"sentiment": polarity, "score": score}
+                    ]
+        final_sentiment, final_score = calculate_weighted_sentiment(img_txt_ret)
+        st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score))
+
+        client = OpenAI(api_key=os.getenv('OPEN_API_KEY'))
+
+        completion = client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
+        messages=[
+            {"role": "system", "content": "I provide insights based on multimodal sentiment fusion results"},
+            {"role": "user", "content": f"The overall sentence sentiment is {final_sentiment}, do backed it up with insightful comments and explanation"},
+            {"role": "user", "content": f"{img_txt_ret}, first dictionary is image sentiment label and score, second dictionary is text modality."},
+            {"role": "user", "content": f"The fusion is based on final_sentiment = max(sentiment_scores, key=sentiment_scores.get)."},
+            {"role": "user", "content": f"Your input sentence is: {message}."}
+        ])
+
+        st.write(completion.choices[0].message.content)
     
     # vid-text fusion results
     if is_video:
-      vid_txt_ret = [
+        st.header('Video Multimodal Fusion Results', divider='rainbow')
+        vid_txt_ret = [
                     {"sentiment": vid_sentiment, "score": vid_score},
                     {"sentiment": polarity, "score": score}
                 ]
-      final_sentiment, final_score = calculate_weighted_sentiment(vid_txt_ret)
-      st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
+        final_sentiment, final_score = calculate_weighted_sentiment(vid_txt_ret)
+        st.success(f"The final sentiment has {final_sentiment.upper()} sentiments associated with it."+str(final_score)) 
+
+        client = OpenAI(api_key=os.getenv('OPEN_API_KEY'))
+
+        completion = client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
+        messages=[
+            {"role": "system", "content": "I provide insights based on multimodal sentiment fusion results"},
+            {"role": "user", "content": f"The overall sentence sentiment is {final_sentiment}, do backed it up with insightful comments and explanation"},
+            {"role": "user", "content": f"{vid_txt_ret}, first dictionary is video sentiment label and score, second dictionary is text modality."},
+            {"role": "user", "content": f"The fusion is based on final_sentiment = max(sentiment_scores, key=sentiment_scores.get)."},
+            {"role": "user", "content": f"Your input sentence is: {message}."}
+        ])
+
+        st.write(completion.choices[0].message.content)
       
