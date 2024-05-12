@@ -13,9 +13,13 @@ from io import BytesIO
 from deepface import DeepFace
 import matplotlib.pyplot as plt
 from moviepy.editor import VideoFileClip
+import ffmpeg
 
 load_dotenv()
 shap.initjs()
+
+def convert_to_h264(input_video_path, output_video_path):
+    ffmpeg.input(input_video_path).output(output_video_path, vcodec='libx264').run()
 
 # TODO: move helper functions out 
 def average_sentiment_across_frames(sentiments):
@@ -187,6 +191,10 @@ def load_img_model_classification():
 def load_img_caption_model(): # BLIP for image captioning
     return pipeline("image-to-text", model="Salesforce/blip-image-captioning-large")
 
+@st.cache_resource
+def load_face_model():
+    return cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+
 is_text = False
 is_image = False
 is_video = False
@@ -245,6 +253,7 @@ elif option == "Video Sentiment Analysis":
         video_path = save_uploaded_video(uploaded_file)
         if video_path:
             st.success("Video uploaded successfully!")
+            st.video(uploaded_file)
         else:
             st.error("Failed to upload video.")
 
@@ -480,6 +489,52 @@ if st.button("Analyze the Sentiment"):
         st.header('Video Sentiment Prediction with Real Time Visualization', divider='rainbow')
         st.success(f"The video has {vid_sentiment.upper()} sentiments associated with it."+str(vid_score)) 
         # <insert stream and visualizations>
+        video = cv2.VideoCapture(video_path)
+        frame_count = video.get(cv2.CAP_PROP_FRAME_COUNT)
+        frame_list = []
+
+        capture = cv2.VideoCapture(video_path)
+
+        for i in range(int(frame_count)):
+            _, frame = capture.read()
+            face_model = load_face_model()
+            face = face_model.detectMultiScale(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
+                                        1.1, 5)
+
+            for x, y, width, height in face:
+                emotion = DeepFace.analyze(frame, actions = ["emotion"], enforce_detection=False)[0]
+                cv2.putText(frame, str(emotion["dominant_emotion"]),
+                            (x, y+height),
+                            cv2.FONT_HERSHEY_COMPLEX,
+                            0.9,
+                            (255,255,0),
+                            2)
+
+                cv2.rectangle(frame, (x, y),
+                            (x + width, y + height),
+                            (255, 255, 0),
+                            2)
+
+                frame_list.append(frame)
+
+            height, width, colors = frame.shape
+            size = (width, height)
+
+        output_path = "Emotions.mp4"
+        output_246path = "Emotions246.mp4"
+        output = cv2.VideoWriter(output_path,
+                                cv2.VideoWriter_fourcc(*"mp4v"),
+                                20,
+                                size)
+
+        for frame in range(len(frame_list)):
+            output.write(frame_list[frame])
+
+        output.release()
+    
+        convert_to_h264(output_path, output_246path)
+
+        st.video(open(output_246path, "rb").read())
 
     # vid-text fusion results
     if is_video:

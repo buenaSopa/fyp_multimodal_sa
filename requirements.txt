@@ -14,3 +14,4 @@ transformers[flax]
 deepface
 moviepy
 opencv-python-headless
+ffmpeg-python
